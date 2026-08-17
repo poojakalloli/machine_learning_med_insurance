@@ -1,8 +1,18 @@
 import streamlit as st
-import requests
+import joblib
+from pathlib import Path
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
+
+# ============================================================
+# LOAD SAVED MACHINE LEARNING PIPELINE
+# ============================================================
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_PATH = BASE_DIR / "models" / "insurance_model.pkl"
+
+model = joblib.load(MODEL_PATH)
 
 
 # ============================================================
@@ -215,20 +225,20 @@ def get_bmi_category(bmi):
 
 def get_prediction(payload):
 
-    response = requests.post(
-        "http://127.0.0.1:8000/predict",
-        json=payload,
-        timeout=10
-    )
+    # Direct prediction from the saved ML pipeline.
+    # No FastAPI server is required for the Streamlit app.
+    input_data = pd.DataFrame([payload])
 
-    if response.status_code == 200:
+    prediction = model.predict(input_data)[0]
+    prediction = float(prediction)
 
-        return response.json()
+    # Keep the same USD conversion used by the application.
+    usd_prediction = prediction / 83
 
-    raise Exception(
-        f"Backend Error {response.status_code}: "
-        f"{response.text}"
-    )
+    return {
+        "predicted_inr": prediction,
+        "predicted_usd": usd_prediction
+    }
 
 
 def add_to_history(
@@ -621,23 +631,6 @@ if submit_btn:
     # ERROR HANDLING
     # ========================================================
 
-    except requests.exceptions.ConnectionError:
-
-        st.error(
-            "❌ Cannot connect to the FastAPI backend."
-        )
-
-        st.code(
-            "uvicorn Backend.main:app --reload",
-            language="powershell"
-        )
-
-    except requests.exceptions.Timeout:
-
-        st.error(
-            "⏳ Backend request timed out."
-        )
-
     except Exception as e:
 
         st.error(
@@ -1007,18 +1000,6 @@ if "current_prediction" in st.session_state:
                     st.success(
                         "✅ What-If result saved to history."
                     )
-
-        except requests.exceptions.ConnectionError:
-
-            st.error(
-                "❌ Cannot connect to FastAPI."
-            )
-
-        except requests.exceptions.Timeout:
-
-            st.error(
-                "⏳ What-if request timed out."
-            )
 
         except Exception as e:
 
