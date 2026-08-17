@@ -1,10 +1,10 @@
 import streamlit as st
 import joblib
+import numpy as np
 from pathlib import Path
 import pandas as pd
 from datetime import datetime
 from io import BytesIO
-
 # ============================================================
 # LOAD SAVED MACHINE LEARNING PIPELINE
 # ============================================================
@@ -225,21 +225,22 @@ def get_bmi_category(bmi):
 
 def get_prediction(payload):
 
-    # Direct prediction from the saved ML pipeline.
-    # No FastAPI server is required for the Streamlit app.
+    # Convert customer input into DataFrame
     input_data = pd.DataFrame([payload])
 
-    prediction = model.predict(input_data)[0]
-    prediction = float(prediction)
+    # Model predicts LOG(1 + charges)
+    log_prediction = model.predict(input_data)[0]
 
-    # Keep the same USD conversion used by the application.
-    usd_prediction = prediction / 83
+    # Convert log prediction back to original USD charge
+    predicted_usd = float(np.expm1(log_prediction))
+
+    # Convert USD to INR using the same rate used during training
+    predicted_inr = predicted_usd * 83.0
 
     return {
-        "predicted_inr": prediction,
-        "predicted_usd": usd_prediction
+        "predicted_inr": predicted_inr,
+        "predicted_usd": predicted_usd
     }
-
 
 def add_to_history(
     age,
